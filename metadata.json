@@ -1,0 +1,6 @@
+{
+  "name": "MarketMind – Financial Information Portal",
+  "description": "Understand the Market. Simply. Real-time Indian and global market data, gold and silver rates by city, NSE/BSE stock prices, mutual funds, crypto, and AI-driven market insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
