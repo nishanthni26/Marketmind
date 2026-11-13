@@ -3,7 +3,7 @@ FROM node:22-slim
 WORKDIR /app
 
 COPY package.json bun.lock* package-lock.json* ./
-RUN npm install
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 
