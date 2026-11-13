@@ -134,22 +134,22 @@ export const MarketTickerBar: React.FC<MarketTickerBarProps> = ({ navigate }) =>
           key={`${item.id}-${suffix}`}
           type="button"
           onClick={() => navigate(item.path)}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 border-r border-slate-200/80 hover:bg-slate-100/80 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 border-r border-white/10 hover:bg-white/10 transition-colors cursor-pointer whitespace-nowrap shrink-0"
         >
           <span
             className={`text-[11px] font-bold tracking-wide ${
-              item.highlight ? 'text-slate-900' : 'text-slate-700'
+              item.highlight ? 'text-emerald-300' : 'text-slate-300'
             }`}
           >
             {item.label}
           </span>
-          <span className="text-[11px] font-mono tabular-nums font-bold text-slate-900">
+          <span className="text-[11px] font-mono tabular-nums font-bold text-white">
             {item.price}
           </span>
           {hasPct && (
             <span
               className={`inline-flex items-center gap-0.5 text-[11px] font-mono tabular-nums font-semibold ${
-                isUp ? 'text-emerald-600' : 'text-rose-600'
+                isUp ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
               {isUp ? (
@@ -170,7 +170,7 @@ export const MarketTickerBar: React.FC<MarketTickerBarProps> = ({ navigate }) =>
   return (
     <div
       aria-label="Live market ticker tape"
-      className="bg-slate-50/90 border-t border-slate-200/80 overflow-hidden select-none"
+      className="bg-[#0B1714] border-t border-white/10 overflow-hidden select-none"
     >
       <div className="animate-ticker items-center">
         {renderSegment('a')}
