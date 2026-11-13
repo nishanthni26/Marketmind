@@ -11,7 +11,14 @@ import { updatePageSeo } from '../utils/seo';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { RechartsTrendChart } from '../components/RechartsTrendChart';
 import { GoldHistoryPanel } from '../components/GoldHistoryPanel';
-import { buildGoldHistory, GoldPurity } from '../utils/goldHistory';
+import { SilverHistoryPanel } from '../components/SilverHistoryPanel';
+import {
+  buildGoldHistory,
+  buildSilverHistory,
+  GoldPurity,
+  SilverUnit,
+} from '../utils/goldHistory';
+import { WatchlistButton } from '../utils/watchlist';
 
 interface GoldSilverPageProps {
   currentPath: string;
@@ -42,6 +49,8 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
   const [selectedDateIso, setSelectedDateIso] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [selectedGoldPurity, setSelectedGoldPurity] = useState<GoldPurity>('24K');
+  const [selectedSilverUnit, setSelectedSilverUnit] = useState<SilverUnit>('1kg');
+  const [usdInr, setUsdInr] = useState<number>(93.85);
   const [loading, setLoading] = useState(false);
 
   const historySectionRef = useRef<HTMLDivElement | null>(null);
@@ -51,9 +60,12 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
   const fetchLiveRates = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/gold-silver');
-      if (res.ok) {
-        const data = await res.json();
+      const [res, bmRes] = await Promise.allSettled([
+        fetch('/api/gold-silver'),
+        fetch('/api/benchmarks'),
+      ]);
+      if (res.status === 'fulfilled' && res.value.ok) {
+        const data = await res.value.json();
         if (Array.isArray(data.cities) && data.cities.length > 0) {
           setAllCities(data.cities);
           const matched = data.cities.find((c: GoldCityRate) => c.slug === targetCitySlug);
@@ -63,6 +75,10 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
             setSelectedCity(data.cities[0]);
           }
         }
+      }
+      if (bmRes.status === 'fulfilled' && bmRes.value.ok) {
+        const b = await bmRes.value.json();
+        if (b.usdInr) setUsdInr(Number(b.usdInr));
       }
     } catch (err) {
       console.warn('Gold/Silver live fetch failed:', err);
@@ -93,7 +109,24 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
     () => goldHistory.find((d) => d.isoDate === selectedDateIso) || goldHistory[0],
     [goldHistory, selectedDateIso]
   );
+
+  const silverHistory = useMemo(() => buildSilverHistory(selectedCity, 30), [selectedCity]);
+  const activeSilverDay = useMemo(
+    () => silverHistory.find((d) => d.isoDate === selectedDateIso) || silverHistory[0],
+    [silverHistory, selectedDateIso]
+  );
+
   const availableDates = useMemo(() => goldHistory.slice(0, 7), [goldHistory]);
+
+  const cityComparison = useMemo(() => {
+    const specificCities = allCities.filter((c) => c.slug !== 'national');
+    const pool = specificCities.length > 0 ? specificCities : allCities;
+    const sorted = [...pool].sort((a, b) => a.rate24KPerGram - b.rate24KPerGram);
+    const lowest = sorted[0];
+    const highest = sorted[sorted.length - 1];
+    const spread10g = highest && lowest ? (highest.rate24KPerGram - lowest.rate24KPerGram) * 10 : 0;
+    return { lowest, highest, spread10g };
+  }, [allCities]);
 
   const chartData = useMemo(() => {
     if (selectedMetal === 'silver') {
@@ -179,24 +212,38 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
             )}
           </div>
 
-          <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs">
-            <span className="text-slate-500 font-medium">City:</span>
-            <select
-              aria-label="Select City"
-              value={selectedCity.slug}
-              onChange={(e) => {
-                const slug = e.target.value;
-                const prefix = selectedMetal === 'silver' ? '/silver-rate-today' : '/gold-rate-today';
-                navigate(slug === 'national' ? `${prefix}/` : `${prefix}/${slug}/`);
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs">
+              <span className="text-slate-500 font-medium">City:</span>
+              <select
+                aria-label="Select City"
+                value={selectedCity.slug}
+                onChange={(e) => {
+                  const slug = e.target.value;
+                  const prefix = selectedMetal === 'silver' ? '/silver-rate-today' : '/gold-rate-today';
+                  navigate(slug === 'national' ? `${prefix}/` : `${prefix}/${slug}/`);
+                }}
+                className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer"
+              >
+                {allCities.map((c) => (
+                  <option key={c.slug} value={c.slug} className="text-slate-900">
+                    {c.city}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <WatchlistButton
+              item={{
+                id: `city:${selectedCity.slug}`,
+                type: 'city',
+                label: selectedCity.city,
+                sublabel: '24K Gold & Silver City Rate',
+                path:
+                  selectedCity.slug === 'national'
+                    ? '/gold-rate-today/'
+                    : `/gold-rate-today/${selectedCity.slug}/`,
               }}
-              className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer"
-            >
-              {allCities.map((c) => (
-                <option key={c.slug} value={c.slug} className="text-slate-900">
-                  {c.city}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
@@ -312,36 +359,55 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
         )}
 
         {selectedMetal === 'silver' && (() => {
-          const silverKgChange = selectedCity.silverChange ?? 0;
           const silverItems = [
             {
+              unitKey: '1g' as SilverUnit,
               label: 'Fine Silver /g',
-              price: selectedCity.silverPerGram,
-              change: Number((silverKgChange / 1000).toFixed(2)),
+              price: activeSilverDay.ratePerGram,
+              change: activeSilverDay.changePerGram,
             },
             {
+              unitKey: '10g' as SilverUnit,
               label: 'Silver Bar /10g',
-              price: Math.round(selectedCity.silverPerGram * 10),
-              change: Math.round((silverKgChange / 100) * 10) / 10,
+              price: activeSilverDay.ratePer10g,
+              change: activeSilverDay.changePer10g,
             },
             {
+              unitKey: '1kg' as SilverUnit,
               label: 'Silver Kilobar /1kg',
-              price: selectedCity.silverPerKg,
-              change: silverKgChange,
+              price: activeSilverDay.ratePerKg,
+              change: activeSilverDay.changePerKg,
             },
           ];
           return (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
-              {silverItems.map((item, idx) => {
+              {silverItems.map((item) => {
                 const isUp = item.change >= 0;
+                const isSelectedCard = selectedSilverUnit === item.unitKey;
                 return (
-                  <div
-                    key={idx}
-                    className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-slate-300 transition-colors min-w-0 flex sm:block items-center justify-between gap-3"
+                  <button
+                    key={item.unitKey}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSilverUnit(item.unitKey);
+                      historySectionRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'nearest',
+                      });
+                    }}
+                    className={`text-left rounded-xl p-3.5 sm:p-4 transition-all min-w-0 flex sm:block items-center justify-between gap-3 cursor-pointer group ${
+                      isSelectedCard
+                        ? 'bg-white border-2 border-slate-900 shadow-xs'
+                        : 'bg-slate-50/70 border border-slate-200 hover:border-slate-400 hover:bg-white'
+                    }`}
                   >
                     <div className="min-w-0">
                       <span className="text-xs sm:text-[11px] font-semibold text-slate-700 sm:text-slate-500 block">{item.label}</span>
                       <span className="text-[11px] text-slate-400 sm:hidden font-mono block mt-0.5">999 Fine</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 group-hover:text-slate-900 mt-1 sm:hidden">
+                        <History className="w-3 h-3" />
+                        <span>{isSelectedCard ? 'Selected' : 'View history'}</span>
+                      </span>
                     </div>
                     <div className="text-right sm:text-left min-w-0">
                       <div className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 font-mono tabular-nums sm:mt-1.5 tracking-tight break-words">
@@ -353,8 +419,14 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
                         </span>
                         <span className="text-slate-500 hidden sm:inline font-normal">999 Fine</span>
                       </div>
+                      <div className="hidden sm:flex items-center justify-between mt-2 text-[10px] font-semibold text-slate-500 group-hover:text-slate-900">
+                        <span className="inline-flex items-center gap-1">
+                          <History className="w-3 h-3" />
+                          <span>{isSelectedCard ? 'Showing date history below' : 'Click for date history'}</span>
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -421,7 +493,7 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
 
       </div>
 
-      {/* Historical Gold Rates with Dates (or Silver/Other Trend Chart) */}
+      {/* Historical Gold / Silver Rates with Dates (or Platinum/Diamond Chart) */}
       <div ref={historySectionRef}>
         {selectedMetal === 'gold' ? (
           <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs">
@@ -430,6 +502,18 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
               selectedPurity={selectedGoldPurity}
               onSelectPurity={setSelectedGoldPurity}
               selectedDateIso={activeGoldDay.isoDate}
+              onSelectDate={(day) =>
+                setSelectedDateIso(day.isToday ? null : day.isoDate)
+              }
+            />
+          </div>
+        ) : selectedMetal === 'silver' ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+            <SilverHistoryPanel
+              city={selectedCity}
+              selectedUnit={selectedSilverUnit}
+              onSelectUnit={setSelectedSilverUnit}
+              selectedDateIso={activeSilverDay.isoDate}
               onSelectDate={(day) =>
                 setSelectedDateIso(day.isToday ? null : day.isoDate)
               }
@@ -465,6 +549,53 @@ export const GoldSilverPage: React.FC<GoldSilverPageProps> = ({
           </div>
         )}
       </div>
+
+      {/* City Benchmark Insights Strip */}
+      {cityComparison.lowest && cityComparison.highest && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs min-w-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+              Lowest 24K Rate Today
+            </span>
+            <div className="flex items-baseline justify-between gap-2 mt-1.5">
+              <span className="font-bold text-slate-900 text-sm truncate">
+                {cityComparison.lowest.city}
+              </span>
+              <span className="font-mono font-bold text-emerald-600 text-sm shrink-0">
+                ₹{cityComparison.lowest.rate24KPerGram.toLocaleString('en-IN')}/g
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs min-w-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+              Highest 24K Rate Today
+            </span>
+            <div className="flex items-baseline justify-between gap-2 mt-1.5">
+              <span className="font-bold text-slate-900 text-sm truncate">
+                {cityComparison.highest.city}
+              </span>
+              <span className="font-mono font-bold text-slate-900 text-sm shrink-0">
+                ₹{cityComparison.highest.rate24KPerGram.toLocaleString('en-IN')}/g
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs min-w-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+              City Spread &amp; FX
+            </span>
+            <div className="flex items-baseline justify-between gap-2 mt-1.5">
+              <span className="font-mono font-bold text-slate-900 text-sm">
+                ₹{cityComparison.spread10g.toLocaleString('en-IN')}/10g
+              </span>
+              <span className="font-mono text-slate-500 text-xs shrink-0">
+                USD/INR: ₹{usdInr.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* City Rates Comparison Table */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">

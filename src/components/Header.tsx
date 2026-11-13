@@ -7,6 +7,7 @@ import {
   Calculator,
 } from 'lucide-react';
 import { mockStocks, goldCityRates, mockMutualFunds, mockCrypto } from '../data/financialData';
+import { MarketTickerBar } from './MarketTickerBar';
 
 interface HeaderProps {
   currentPath: string;
@@ -66,13 +67,24 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navLinks = [
     { label: 'Gold & Silver', path: '/gold-rate-today/' },
-    { label: 'Sensex', path: '/stocks/sensex/' },
-    { label: 'Nifty 50', path: '/stocks/nifty50/' },
     { label: 'Stocks', path: '/stocks/' },
-    { label: 'Calculator', path: '/calculator/' },
     { label: 'Mutual Funds', path: '/mutual-funds/' },
     { label: 'Crypto', path: '/crypto/' },
     { label: 'Commodities', path: '/commodities/' },
+    { label: 'Portfolio', path: '/portfolio/' },
+  ];
+
+  const mobileNavLinks = [
+    { label: 'Home', path: '/' },
+    { label: 'Portfolio & Watchlist', path: '/portfolio/' },
+    { label: 'Gold & Silver', path: '/gold-rate-today/' },
+    { label: 'Sensex', path: '/stocks/sensex/' },
+    { label: 'Nifty 50', path: '/stocks/nifty50/' },
+    { label: 'Stocks', path: '/stocks/' },
+    { label: 'Mutual Funds', path: '/mutual-funds/' },
+    { label: 'Crypto', path: '/crypto/' },
+    { label: 'Commodities', path: '/commodities/' },
+    { label: 'Calculator', path: '/calculator/' },
   ];
 
   return (
@@ -195,9 +207,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
+      <MarketTickerBar navigate={navigate} />
+
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white p-4 space-y-1">
-          {navLinks.map((link) => (
+          {mobileNavLinks.map((link) => (
             <button
               key={link.path}
               onClick={() => {

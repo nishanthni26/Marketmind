@@ -9,6 +9,11 @@ import {
   CheckCircle2,
   Sparkles,
   History,
+  Star,
+  Briefcase,
+  Calculator,
+  Scale,
+  ArrowUpRight,
 } from 'lucide-react';
 import {
   goldCityRates as fallbackGoldCityRates,
@@ -16,11 +21,19 @@ import {
   mockNewsArticles as fallbackMockNewsArticles,
   mockCrypto as fallbackMockCrypto,
   mockCommodities as fallbackMockCommodities,
+  mockMutualFunds,
 } from '../data/financialData';
 import { GoldCityRate, StockData, NewsArticle, CryptoData, CommodityData } from '../types';
 import { updatePageSeo } from '../utils/seo';
 import { GoldHistoryPanel } from '../components/GoldHistoryPanel';
-import { buildGoldHistory, GoldPurity } from '../utils/goldHistory';
+import { SilverHistoryPanel } from '../components/SilverHistoryPanel';
+import {
+  buildGoldHistory,
+  buildSilverHistory,
+  GoldPurity,
+  SilverUnit,
+} from '../utils/goldHistory';
+import { useWatchlist, WatchlistButton } from '../utils/watchlist';
 
 interface HomePageProps {
   navigate: (path: string) => void;
@@ -36,12 +49,14 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
     sensex: { price: number; changePercent: number; change: number };
     gold24KPerGram: number;
     silverPerKg: number;
+    usdInr: number;
     isLive: boolean;
   }>({
     nifty50: { price: 24350.25, changePercent: 0.59, change: 142.8 },
     sensex: { price: 80210.80, changePercent: 0.61, change: 485.2 },
     gold24KPerGram: 14268,
     silverPerKg: 200000,
+    usdInr: 93.85,
     isLive: false,
   });
 
@@ -52,6 +67,10 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [showGoldHistory, setShowGoldHistory] = useState<boolean>(false);
   const [selectedGoldPurity, setSelectedGoldPurity] = useState<GoldPurity>('24K');
+  const [showSilverHistory, setShowSilverHistory] = useState<boolean>(false);
+  const [selectedSilverUnit, setSelectedSilverUnit] = useState<SilverUnit>('1kg');
+
+  const { items: watchlistItems } = useWatchlist();
 
   const [newsList, setNewsList] = useState<NewsArticle[]>(fallbackMockNewsArticles);
   const [stocksList, setStocksList] = useState<StockData[]>(fallbackMockStocks);
@@ -59,7 +78,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
   const [commoditiesList, setCommoditiesList] = useState<CommodityData[]>(fallbackMockCommodities);
   const [loading, setLoading] = useState(false);
 
-  const [stockTab, setStockTab] = useState<'gainers' | 'losers' | 'most-active'>('gainers');
+  const [stockTab, setStockTab] = useState<'all' | 'gainers' | 'losers'>('all');
 
   // Fetch real data from server live endpoints
   const fetchLiveData = async () => {
@@ -81,6 +100,7 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
           sensex: bmData.sensex || benchmarks.sensex,
           gold24KPerGram: bmData.gold24KPerGram || benchmarks.gold24KPerGram,
           silverPerKg: bmData.silverPerKg || benchmarks.silverPerKg,
+          usdInr: bmData.usdInr || benchmarks.usdInr,
           isLive: Boolean(bmData.isLive),
         });
       }
@@ -148,14 +168,19 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
     : newsList.filter((n) => n.category === newsCategory);
 
   const displayedStocks = (() => {
+    const equities = stocksList.filter((s) => s.symbol !== 'SENSEX' && s.symbol !== 'NIFTY50');
     switch (stockTab) {
       case 'gainers':
-        return stocksList.filter((s) => s.changePercent > 0);
+        return equities
+          .filter((s) => s.changePercent > 0)
+          .sort((a, b) => b.changePercent - a.changePercent);
       case 'losers':
-        return stocksList.filter((s) => s.changePercent < 0);
-      case 'most-active':
+        return equities
+          .filter((s) => s.changePercent < 0)
+          .sort((a, b) => a.changePercent - b.changePercent);
+      case 'all':
       default:
-        return stocksList.filter((s) => s.isMostActive);
+        return equities;
     }
   })();
 
@@ -171,7 +196,54 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
     [goldHistory, selectedDateIso]
   );
 
+  const silverHistory = useMemo(
+    () => buildSilverHistory(selectedGoldCity, 30),
+    [selectedGoldCity]
+  );
+
+  const activeSilverDay = useMemo(
+    () => silverHistory.find((d) => d.isoDate === selectedDateIso) || silverHistory[0],
+    [silverHistory, selectedDateIso]
+  );
+
   const availableDates = useMemo(() => goldHistory.slice(0, 7), [goldHistory]);
+
+  const watchlistPreview = useMemo(() => {
+    return watchlistItems.slice(0, 4).map((w) => {
+      let priceLabel = '—';
+      let changePct: number | null = null;
+      if (w.type === 'stock') {
+        const sym = w.id.replace('stock:', '');
+        const st = stocksList.find((s) => s.symbol === sym);
+        if (st) {
+          priceLabel = `${st.currency === 'USD' ? '$' : '₹'}${st.price.toLocaleString('en-IN')}`;
+          changePct = st.changePercent;
+        }
+      } else if (w.type === 'mutual-fund') {
+        const slug = w.id.replace('mf:', '');
+        const mf = mockMutualFunds.find((m) => m.slug === slug);
+        if (mf) {
+          priceLabel = `₹${mf.nav.toLocaleString('en-IN')}`;
+          changePct = mf.navChangePercent;
+        }
+      } else if (w.type === 'crypto') {
+        const sym = w.id.replace('crypto:', '');
+        const c = cryptoList.find((x) => x.symbol === sym);
+        if (c) {
+          priceLabel = `₹${c.priceINR.toLocaleString('en-IN')}`;
+          changePct = c.change24h;
+        }
+      } else if (w.type === 'city') {
+        const slug = w.id.replace('city:', '');
+        const ct = cityRates.find((x) => x.slug === slug);
+        if (ct) {
+          priceLabel = `₹${ct.rate24KPerGram.toLocaleString('en-IN')}/g`;
+          changePct = ct.changePercent;
+        }
+      }
+      return { ...w, priceLabel, changePct };
+    });
+  }, [watchlistItems, stocksList, cryptoList, cityRates]);
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -231,6 +303,8 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
           onClick={() => {
             setActiveTab('silver');
             setSelectedMetal('silver');
+            setSelectedSilverUnit('1kg');
+            setShowSilverHistory(true);
           }}
           className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs cursor-pointer hover:border-slate-300 transition-colors group min-w-0"
         >
@@ -608,51 +682,110 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
           )}
 
           {selectedMetal === 'silver' && (() => {
-            const silverKgChange = selectedGoldCity.silverChange ?? 0;
             const silverItems = [
               {
+                unitKey: '1g' as SilverUnit,
                 label: 'Fine Silver /g',
-                price: selectedGoldCity.silverPerGram,
-                change: Number((silverKgChange / 1000).toFixed(2)),
+                price: activeSilverDay.ratePerGram,
+                change: activeSilverDay.changePerGram,
               },
               {
+                unitKey: '10g' as SilverUnit,
                 label: 'Silver Bar /10g',
-                price: Math.round(selectedGoldCity.silverPerGram * 10),
-                change: Math.round((silverKgChange / 100) * 10) / 10,
+                price: activeSilverDay.ratePer10g,
+                change: activeSilverDay.changePer10g,
               },
               {
+                unitKey: '1kg' as SilverUnit,
                 label: 'Silver Kilobar /1kg',
-                price: selectedGoldCity.silverPerKg,
-                change: silverKgChange,
+                price: activeSilverDay.ratePerKg,
+                change: activeSilverDay.changePerKg,
               },
             ];
             return (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                {silverItems.map((item, idx) => {
-                  const isUp = item.change >= 0;
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 sm:p-4 hover:border-slate-300 transition-colors min-w-0 flex sm:block items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <span className="text-xs sm:text-[11px] font-semibold text-slate-700 sm:text-slate-500 block">{item.label}</span>
-                        <span className="text-[11px] text-slate-400 sm:hidden font-mono block mt-0.5">999 Refined</span>
-                      </div>
-                      <div className="text-right sm:text-left min-w-0">
-                        <div className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 font-mono tabular-nums sm:mt-1.5 tracking-tight break-words">
-                          ₹{item.price.toLocaleString('en-IN')}
-                        </div>
-                        <div className="flex items-center justify-end sm:justify-between sm:mt-2 sm:pt-2 sm:border-t sm:border-slate-200 text-[11px] font-mono font-semibold mt-0.5">
-                          <span className={isUp ? 'text-emerald-600' : 'text-rose-600'}>
-                            {isUp ? '+' : '-'}₹{Math.abs(item.change).toLocaleString('en-IN')}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  {silverItems.map((item) => {
+                    const isUp = item.change >= 0;
+                    const isSelectedCard =
+                      showSilverHistory && selectedSilverUnit === item.unitKey;
+                    return (
+                      <button
+                        key={item.unitKey}
+                        type="button"
+                        onClick={() => {
+                          if (showSilverHistory && selectedSilverUnit === item.unitKey) {
+                            setShowSilverHistory(false);
+                          } else {
+                            setSelectedSilverUnit(item.unitKey);
+                            setShowSilverHistory(true);
+                          }
+                        }}
+                        className={`text-left rounded-xl p-3.5 sm:p-4 transition-all min-w-0 flex sm:block items-center justify-between gap-3 cursor-pointer group ${
+                          isSelectedCard
+                            ? 'bg-white border-2 border-slate-900 shadow-xs'
+                            : 'bg-slate-50/70 border border-slate-200 hover:border-slate-400 hover:bg-white'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <span className="text-xs sm:text-[11px] font-semibold text-slate-700 sm:text-slate-500 block">
+                            {item.label}
                           </span>
-                          <span className="text-slate-500 hidden sm:inline font-normal">999 Refined</span>
+                          <span className="text-[11px] text-slate-400 sm:hidden font-mono block mt-0.5">
+                            999 Refined
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 group-hover:text-slate-900 mt-1 sm:hidden">
+                            <History className="w-3 h-3" />
+                            <span>{isSelectedCard ? 'Hide history' : 'View history'}</span>
+                          </span>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                        <div className="text-right sm:text-left min-w-0">
+                          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 font-mono tabular-nums sm:mt-1.5 tracking-tight break-words">
+                            ₹{item.price.toLocaleString('en-IN')}
+                          </div>
+                          <div className="flex items-center justify-end sm:justify-between sm:mt-2 sm:pt-2 sm:border-t sm:border-slate-200 text-[11px] font-mono font-semibold mt-0.5">
+                            <span className={isUp ? 'text-emerald-600' : 'text-rose-600'}>
+                              {isUp ? '+' : '-'}₹{Math.abs(item.change).toLocaleString('en-IN')}
+                            </span>
+                            <span className="text-slate-500 hidden sm:inline font-normal">
+                              999 Refined
+                            </span>
+                          </div>
+                          <div className="hidden sm:flex items-center justify-between mt-2 text-[10px] font-semibold text-slate-500 group-hover:text-slate-900">
+                            <span className="inline-flex items-center gap-1">
+                              <History className="w-3 h-3" />
+                              <span>
+                                {isSelectedCard
+                                  ? 'Showing date history'
+                                  : 'Click for date history'}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {showSilverHistory && (
+                  <SilverHistoryPanel
+                    city={selectedGoldCity}
+                    selectedUnit={selectedSilverUnit}
+                    onSelectUnit={setSelectedSilverUnit}
+                    selectedDateIso={activeSilverDay.isoDate}
+                    onSelectDate={(day) =>
+                      setSelectedDateIso(day.isToday ? null : day.isoDate)
+                    }
+                    onClose={() => setShowSilverHistory(false)}
+                    onOpenFullPage={() =>
+                      navigate(
+                        selectedGoldCity.slug === 'national'
+                          ? '/silver-rate-today/'
+                          : `/silver-rate-today/${selectedGoldCity.slug}/`
+                      )
+                    }
+                  />
+                )}
               </div>
             );
           })()}
@@ -729,6 +862,14 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
 
             <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
               <button
+                onClick={() => setStockTab('all')}
+                className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
+                  stockTab === 'all' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All
+              </button>
+              <button
                 onClick={() => setStockTab('gainers')}
                 className={`px-3 py-1 rounded-md transition-colors cursor-pointer ${
                   stockTab === 'gainers' ? 'bg-white text-slate-900 font-bold shadow-xs' : 'text-slate-600 hover:text-slate-900'
@@ -757,7 +898,21 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono-num">
-                {displayedStocks.map((stock) => {
+                {displayedStocks.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-6 px-3 text-center font-sans text-xs text-slate-500">
+                      No stocks currently match this filter.{' '}
+                      <button
+                        type="button"
+                        onClick={() => setStockTab('all')}
+                        className="text-emerald-700 font-semibold underline cursor-pointer"
+                      >
+                        Show all equities
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  displayedStocks.map((stock) => {
                   const isPositive = stock.changePercent >= 0;
                   return (
                     <tr
@@ -765,7 +920,21 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
                       onClick={() => navigate(`/stocks/${stock.slug}/`)}
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-3 font-sans font-semibold text-slate-900">{stock.symbol}</td>
+                      <td className="py-3 px-3 font-sans font-semibold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <WatchlistButton
+                            compact
+                            item={{
+                              id: `stock:${stock.symbol}`,
+                              type: 'stock',
+                              label: stock.symbol,
+                              sublabel: stock.name,
+                              path: `/stocks/${stock.slug}/`,
+                            }}
+                          />
+                          <span>{stock.symbol}</span>
+                        </div>
+                      </td>
                       <td className="py-3 px-3 text-right font-bold text-slate-900">
                         {stock.currency === 'USD' ? '$' : '₹'}{stock.price.toLocaleString('en-IN')}
                       </td>
@@ -779,7 +948,8 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
                       </td>
                     </tr>
                   );
-                })}
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -801,7 +971,19 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
                   onClick={() => navigate(`/crypto/${coin.slug}/`)}
                   className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3 cursor-pointer hover:border-slate-300 transition-all"
                 >
-                  <span className="font-sans font-semibold text-slate-900 min-w-0 break-words">{coin.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <WatchlistButton
+                      compact
+                      item={{
+                        id: `crypto:${coin.symbol}`,
+                        type: 'crypto',
+                        label: coin.symbol,
+                        sublabel: coin.name,
+                        path: `/crypto/${coin.slug}/`,
+                      }}
+                    />
+                    <span className="font-sans font-semibold text-slate-900 min-w-0 break-words">{coin.name}</span>
+                  </div>
                   <div className="text-right shrink-0">
                     <span className="font-bold text-slate-900">${coin.priceUSD.toLocaleString('en-US')}</span>
                     <span className={`block text-[10px] ${coin.change24h >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -835,6 +1017,133 @@ export const HomePage: React.FC<HomePageProps> = ({ navigate }) => {
           </div>
         </div>
       )}
+
+      {/* 7. GROWW-STYLE WATCHLIST & TOOLS HUB */}
+      <section className="space-y-4 pt-1">
+        {watchlistPreview.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-emerald-600 fill-emerald-600" />
+                <h2 className="text-sm font-bold text-slate-900">Your Watchlist</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/portfolio/')}
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>Open Portfolio &amp; Watchlist</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {watchlistPreview.map((w) => {
+                const isUp = (w.changePct ?? 0) >= 0;
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => navigate(w.path)}
+                    className="text-left p-3 rounded-xl bg-slate-50/70 hover:bg-white border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer min-w-0 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-slate-900 block truncate">
+                        {w.label}
+                      </span>
+                      <span className="text-[11px] text-slate-500 block truncate">
+                        {w.sublabel}
+                      </span>
+                    </div>
+                    <div className="text-right font-mono tabular-nums shrink-0">
+                      <span className="text-xs font-bold text-slate-900 block">
+                        {w.priceLabel}
+                      </span>
+                      {w.changePct !== null && (
+                        <span
+                          className={`text-[10px] font-semibold block ${
+                            isUp ? 'text-emerald-600' : 'text-rose-600'
+                          }`}
+                        >
+                          {isUp ? '+' : ''}
+                          {w.changePct.toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/portfolio/')}
+            className="text-left bg-white rounded-xl border border-slate-200 hover:border-slate-300 p-4 shadow-xs transition-colors cursor-pointer flex items-start justify-between gap-3 group"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                <Briefcase className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Portfolio Tracker</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Log stocks, gold, silver &amp; funds for live P&amp;L valuation
+              </p>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/calculator/')}
+            className="text-left bg-white rounded-xl border border-slate-200 hover:border-slate-300 p-4 shadow-xs transition-colors cursor-pointer flex items-start justify-between gap-3 group"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                <Calculator className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>SIP &amp; Gold Calculator</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Compute jewellery GST + making charges or SIP wealth growth
+              </p>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/mutual-funds/')}
+            className="text-left bg-white rounded-xl border border-slate-200 hover:border-slate-300 p-4 shadow-xs transition-colors cursor-pointer flex items-start justify-between gap-3 group"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                <Scale className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Compare Mutual Funds</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Side-by-side 3Y/5Y CAGR, expense ratios &amp; portfolio mix
+              </p>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 shrink-0" />
+          </button>
+
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex items-center justify-between gap-3 min-w-0">
+            <div className="min-w-0">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                USD / INR Spot
+              </span>
+              <span className="text-lg font-bold text-slate-900 font-mono tabular-nums mt-0.5 block">
+                ₹{benchmarks.usdInr.toFixed(2)}
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono shrink-0">
+              Live FX Ref
+            </span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

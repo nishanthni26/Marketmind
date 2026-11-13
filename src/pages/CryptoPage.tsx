@@ -9,6 +9,7 @@ import { CryptoData } from '../types';
 import { updatePageSeo } from '../utils/seo';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { RechartsTrendChart } from '../components/RechartsTrendChart';
+import { WatchlistButton } from '../utils/watchlist';
 
 interface CryptoPageProps {
   currentPath: string;
@@ -93,6 +94,17 @@ export const CryptoPage: React.FC<CryptoPageProps> = ({ currentPath, navigate })
               <p className="text-xs text-slate-500 mt-1 max-w-xl">
                 {matchedCoin.description}
               </p>
+              <div className="mt-3">
+                <WatchlistButton
+                  item={{
+                    id: `crypto:${matchedCoin.symbol}`,
+                    type: 'crypto',
+                    label: matchedCoin.symbol,
+                    sublabel: matchedCoin.name,
+                    path: `/crypto/${matchedCoin.slug}/`,
+                  }}
+                />
+              </div>
             </div>
 
             <div className="lg:text-right font-mono min-w-0">
@@ -203,8 +215,22 @@ export const CryptoPage: React.FC<CryptoPageProps> = ({ currentPath, navigate })
                   className="hover:bg-slate-50 cursor-pointer transition-colors"
                 >
                   <td className="py-3 px-3">
-                    <span className="font-bold text-slate-900 font-sans text-xs">{coin.name}</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">{coin.symbol}</span>
+                    <div className="flex items-center gap-2">
+                      <WatchlistButton
+                        compact
+                        item={{
+                          id: `crypto:${coin.symbol}`,
+                          type: 'crypto',
+                          label: coin.symbol,
+                          sublabel: coin.name,
+                          path: `/crypto/${coin.slug}/`,
+                        }}
+                      />
+                      <div>
+                        <span className="font-bold text-slate-900 font-sans text-xs">{coin.name}</span>
+                        <span className="text-[10px] text-slate-500 block font-mono">{coin.symbol}</span>
+                      </div>
+                    </div>
                   </td>
                   <td className="py-3 px-3 text-right font-bold text-slate-900">
                     ₹{coin.priceINR.toLocaleString('en-IN')}

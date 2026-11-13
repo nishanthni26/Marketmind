@@ -1,8 +1,10 @@
 import express, { Request, Response } from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
 import {
   mockOverview,
   goldCityRates,
@@ -290,6 +292,15 @@ async function fetchRealMarketData() {
         ICICIBANK: 'ICICIBANK.NS',
         TATAMOTORS: 'TMPV.NS',
         SBIN: 'SBIN.NS',
+        BHARTIARTL: 'BHARTIARTL.NS',
+        ITC: 'ITC.NS',
+        LT: 'LT.NS',
+        AXISBANK: 'AXISBANK.NS',
+        KOTAKBANK: 'KOTAKBANK.NS',
+        SUNPHARMA: 'SUNPHARMA.NS',
+        MARUTI: 'MARUTI.NS',
+        TITAN: 'TITAN.NS',
+        BAJFINANCE: 'BAJFINANCE.NS',
         AAPL: 'AAPL',
         NVDA: 'NVDA',
       };
@@ -1305,15 +1316,20 @@ ${xmlEntries}
   res.send(sitemapXml);
 });
 
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 async function startServer() {
   if (!isProduction) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
+    const distPath = path.resolve(rootDir, 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.resolve(distPath, 'index.html'));
@@ -1321,7 +1337,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`MarketMind financial server running on http://localhost:${PORT}`);
+    console.log(`MarketMind financial server running on http://0.0.0.0:${PORT}`);
   });
 }
 

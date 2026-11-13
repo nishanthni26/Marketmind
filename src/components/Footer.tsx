@@ -19,6 +19,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
     {
       title: 'Explore',
       links: [
+        { label: 'Portfolio Tracker', path: '/portfolio/' },
         { label: 'Cryptocurrency', path: '/crypto/' },
         { label: 'Commodities', path: '/commodities/' },
         { label: 'Market News', path: '/news/' },
@@ -29,9 +30,9 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
       title: 'Resources & Legal',
       links: [
         { label: 'Learn Finance', path: '/learn/' },
-        { label: 'Disclaimer', path: '/disclaimer/' },
+        { label: 'Terms & Conditions', path: '/terms-of-service/' },
         { label: 'Privacy Policy', path: '/privacy-policy/' },
-        { label: 'Terms of Service', path: '/terms-of-service/' },
+        { label: 'Disclaimer', path: '/disclaimer/' },
       ],
     },
   ];
@@ -81,9 +82,46 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
           </div>
         </div>
 
-        <div className="border-t border-slate-200 mt-8 pt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-500">
-          <span>© {new Date().getFullYear()} MarketMind. Real-time indicative spot data.</span>
-          <span className="text-slate-400">For informational and educational use only.</span>
+        <div className="mt-8 pt-5 border-t border-slate-200 space-y-3">
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            <strong className="text-slate-700 font-semibold">Disclaimer:</strong> Investments in securities market are subject to market risks. Read all related documents carefully before investing. MarketMind is an informational portal and is not a SEBI-registered Investment Adviser or Research Analyst. Bullion, FX, crypto, and equity prices are indicative.{' '}
+            <button
+              type="button"
+              onClick={() => navigate('/disclaimer/')}
+              className="text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer"
+            >
+              Read full disclaimer
+            </button>
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-500">
+            <span>© {new Date().getFullYear()} MarketMind. Real-time indicative spot data.</span>
+            <div className="flex flex-wrap items-center gap-3 text-slate-500">
+              <button
+                type="button"
+                onClick={() => navigate('/terms-of-service/')}
+                className="hover:text-slate-900 cursor-pointer"
+              >
+                Terms &amp; Conditions
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={() => navigate('/privacy-policy/')}
+                className="hover:text-slate-900 cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={() => navigate('/disclaimer/')}
+                className="hover:text-slate-900 cursor-pointer"
+              >
+                Disclaimer
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </footer>

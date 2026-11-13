@@ -15,6 +15,8 @@ import { InsightsPage } from './pages/InsightsPage';
 import { AdminPage } from './pages/AdminPage';
 import { LegalPage } from './pages/LegalPage';
 import { CalculatorPage } from './pages/CalculatorPage';
+import { PortfolioPage } from './pages/PortfolioPage';
+import { WatchlistProvider } from './utils/watchlist';
 
 function AppContent() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -110,10 +112,14 @@ function AppContent() {
       return <CalculatorPage navigate={navigate} />;
     }
 
-    if (cleanPath.startsWith('/privacy-policy')) {
+    if (cleanPath.startsWith('/portfolio')) {
+      return <PortfolioPage navigate={navigate} />;
+    }
+
+    if (cleanPath.startsWith('/privacy')) {
       return <LegalPage type="privacy" navigate={navigate} />;
     }
-    if (cleanPath.startsWith('/terms-of-service')) {
+    if (cleanPath.startsWith('/terms')) {
       return <LegalPage type="terms" navigate={navigate} />;
     }
     if (cleanPath.startsWith('/disclaimer')) {
@@ -147,7 +153,9 @@ function AppContent() {
 export default function App() {
   return (
     <ToastProvider>
-      <AppContent />
+      <WatchlistProvider>
+        <AppContent />
+      </WatchlistProvider>
     </ToastProvider>
   );
 }

@@ -12,6 +12,7 @@ import { StockData } from '../types';
 import { updatePageSeo } from '../utils/seo';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { RechartsTrendChart } from '../components/RechartsTrendChart';
+import { WatchlistButton } from '../utils/watchlist';
 
 interface StocksPageProps {
   currentPath: string;
@@ -243,6 +244,19 @@ export const StocksPage: React.FC<StocksPageProps> = ({ currentPath, navigate })
               <p className="text-xs text-slate-600 mt-1 max-w-2xl line-clamp-2">
                 {matchedStock.description}
               </p>
+              {!isIndexPage && (
+                <div className="mt-3">
+                  <WatchlistButton
+                    item={{
+                      id: `stock:${matchedStock.symbol}`,
+                      type: 'stock',
+                      label: matchedStock.symbol,
+                      sublabel: matchedStock.name,
+                      path: `/stocks/${matchedStock.slug}/`,
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="sm:text-right bg-slate-50 p-4 rounded-xl border border-slate-200 min-w-0">
@@ -642,8 +656,24 @@ export const StocksPage: React.FC<StocksPageProps> = ({ currentPath, navigate })
                     className="hover:bg-slate-50 cursor-pointer transition-colors"
                   >
                     <td className="py-3 px-3">
-                      <div className="font-sans font-semibold text-slate-900">{stock.name}</div>
-                      <div className="text-[10px] text-slate-500 font-sans">{stock.symbol}</div>
+                      <div className="flex items-center gap-2">
+                        {stock.symbol !== 'SENSEX' && stock.symbol !== 'NIFTY50' && (
+                          <WatchlistButton
+                            compact
+                            item={{
+                              id: `stock:${stock.symbol}`,
+                              type: 'stock',
+                              label: stock.symbol,
+                              sublabel: stock.name,
+                              path: `/stocks/${stock.slug}/`,
+                            }}
+                          />
+                        )}
+                        <div>
+                          <div className="font-sans font-semibold text-slate-900">{stock.name}</div>
+                          <div className="text-[10px] text-slate-500 font-sans">{stock.symbol}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-3 px-3 font-sans text-slate-500">{stock.exchange}</td>
                     <td className="py-3 px-3 font-sans text-slate-500 text-[11px]">

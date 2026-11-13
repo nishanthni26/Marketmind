@@ -173,3 +173,91 @@ export function buildGoldChartSeries(
       };
     });
 }
+
+export type SilverUnit = '1g' | '10g' | '1kg';
+
+export interface SilverHistoryDay {
+  isoDate: string;
+  label: string;
+  shortLabel: string;
+  isToday: boolean;
+  ratePerGram: number;
+  ratePer10g: number;
+  ratePerKg: number;
+  changePerGram: number;
+  changePer10g: number;
+  changePerKg: number;
+  changePercent: number;
+}
+
+export function buildSilverHistory(city: GoldCityRate, days: number = 30): SilverHistoryDay[] {
+  const totalDays = Math.min(Math.max(days, 2), 30);
+  const todayKg = Math.round(city.silverPerKg || (city.silverPerGram ? city.silverPerGram * 1000 : 200000));
+  const liveChangeKg = city.silverChange ?? 0;
+
+  const citySeed = (city.slug || 'national')
+    .split('')
+    .reduce((acc, ch) => acc + ch.charCodeAt(0) * 3, 0);
+
+  const ratesKgDesc: number[] = new Array(totalDays + 1);
+  ratesKgDesc[0] = todayKg;
+  ratesKgDesc[1] = Math.max(10000, Math.round(todayKg - liveChangeKg));
+
+  for (let i = 2; i <= totalDays; i++) {
+    const baseStep = HISTORICAL_STEP_PCT[(i + 3) % HISTORICAL_STEP_PCT.length] * 1.15;
+    const microJitter = (((citySeed + i * 11) % 13) - 6) * 0.00025;
+    const pctDelta = baseStep + microJitter;
+    ratesKgDesc[i] = Math.max(10000, Math.round(ratesKgDesc[i - 1] / (1 + pctDelta)));
+  }
+
+  const now = new Date();
+  const history: SilverHistoryDay[] = [];
+
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+
+    const rKg = ratesKgDesc[i];
+    const prevKg = ratesKgDesc[i + 1];
+    const rGram = i === 0 && city.silverPerGram ? Number(city.silverPerGram.toFixed(2)) : Number((rKg / 1000).toFixed(2));
+    const r10g = Math.round(rKg / 100);
+
+    const chgKg = i === 0 ? Math.round(liveChangeKg) : rKg - prevKg;
+    const chgGram = Number((chgKg / 1000).toFixed(2));
+    const chg10g = Number((chgKg / 100).toFixed(1));
+    const chgPct = prevKg > 0 ? Math.round(((rKg - prevKg) / prevKg) * 10000) / 100 : 0;
+
+    history.push({
+      isoDate: formatIsoDate(d),
+      label: formatLongDate(d),
+      shortLabel: formatShortDate(d),
+      isToday: i === 0,
+      ratePerGram: rGram,
+      ratePer10g: r10g,
+      ratePerKg: rKg,
+      changePerGram: chgGram,
+      changePer10g: chg10g,
+      changePerKg: chgKg,
+      changePercent: chgPct,
+    });
+  }
+
+  return history;
+}
+
+export function buildSilverChartSeries(
+  history: SilverHistoryDay[],
+  unit: SilverUnit = '1kg'
+): PricePoint[] {
+  return [...history]
+    .reverse()
+    .map((day) => ({
+      date: day.shortLabel.replace(/\s+\d{4}$/, ''),
+      price:
+        unit === '1g'
+          ? day.ratePerGram
+          : unit === '10g'
+          ? day.ratePer10g
+          : day.ratePerKg,
+    }));
+}
